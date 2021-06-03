@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build and export
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          tags: sslscan:latest
+          outputs: type=docker,dest=/tmp/sslscan.tar
+          load: true
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: sslscan
+          path: /tmp/sslscan.tar
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: sslscan
+          path: /tmp
+      - name: Load image
+        run: docker load --input /tmp/sslscan.tar
+      - name: Run test
+        run: docker run --rm -v $PWD:/test sslscan:latest /test/test.txt
